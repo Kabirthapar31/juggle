@@ -43,7 +43,6 @@
       key: getComputedStyle(document.documentElement).getPropertyValue('--key').trim(),
     };
 
-    // Speciality word lists (from your provided list)
     const SPECIALITY_WORDS = {
       medicine: ["fever","acute","ulcer","viral","cough","tumor"],
       orthopaedics: ["femur","joint","brace","screw","plate","tibia","spine","graft"],
@@ -85,7 +84,7 @@
     function saveStats(s){localStorage.setItem(LS_KEY, JSON.stringify(s));}
 
     function App(){
-      const [speciality, setSpeciality] = useState(null); // New: track selected speciality
+      const [speciality, setSpeciality] = useState(null);
       const WORDS = speciality ? SPECIALITY_WORDS[speciality] : SAFE_FALLBACK;
       const [mode,setMode] = useState(localStorage.getItem(LS_MODE) || "daily");
       const todayKey = new Date().toISOString().slice(0,10);
@@ -104,14 +103,16 @@
       const [toast,setToast] = useState(null);
       const [stats,setStats] = useState(loadStats());
       const [gameOver,setGameOver] = useState({over:false, win:false});
+      const [revealAnswer, setRevealAnswer] = useState(null); // NEW
 
       useEffect(()=>{
-        if (!speciality) return; // wait for speciality selection
+        if (!speciality) return;
         const nextAns = mode==="daily" ? dailyWord : pickRandomWord(WORDS);
         setAnswer(nextAns);
         setRows(Array(6).fill(""));
         setStates(Array(6).fill(Array(5).fill("empty")));
         setRow(0); setCol(0); setGameOver({over:false, win:false});
+        setRevealAnswer(null); // Reset on new game
         localStorage.setItem(LS_MODE, mode);
       },[mode,dailyWord,speciality]);
 
@@ -151,7 +152,10 @@
         const score = scoreGuess(guess, answer);
         const ns = states.slice(); ns[row]=score; setStates(ns);
         if(guess===answer){ endGame(true,row); }
-        else if(row===5){ endGame(false,row); }
+        else if(row===5){ 
+          setRevealAnswer(answer); // NEW: show answer on final wrong guess
+          endGame(false,row); 
+        }
         else { setRow(row+1); setCol(0); }
       }
 
@@ -242,6 +246,12 @@
               )
             )
           ),
+          // Reveal Answer if lost
+          (gameOver.over && !gameOver.win && revealAnswer) ? 
+            React.createElement("div",{className:"text-center text-lg font-bold text-red-600 mb-4"}, 
+              `The word was: ${revealAnswer.toUpperCase()}`
+            ) 
+          : null,
           // Keyboard
           React.createElement("div",{className:"select-none"},
             KEY_ROWS.map((rowKeys,i)=>
