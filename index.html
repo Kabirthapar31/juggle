@@ -3,243 +3,144 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Juggle — Medical Wordle (custom)</title>
-  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <title>Medical Wordle</title>
   <style>
-    :root{
-      --bg:#f8f7f4;
-      --tile:#f0eee9;
-      --border:#d7d3ca;
-      --text:#1f2937;
-      --wrong:#e9a5a5;
-      --present:#f6d26b;
-      --correct:#6bcf8b;
-      --key:#e9e6df;
+    body {
+      font-family: Arial, sans-serif;
+      background: #f8f8f8;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
     }
-    body{background:var(--bg); color:var(--text);}
-    .tile{background:var(--tile); border:1px solid var(--border);}
-    .tile.wrong{background:var(--wrong);}
-    .tile.present{background:var(--present);}
-    .tile.correct{background:var(--correct);}
-    .key{background:var(--key); border:1px solid var(--border);}
-    .shadow-soft{box-shadow:0 10px 20px rgba(0,0,0,.06);}
+    h1 {
+      margin-bottom: 10px;
+    }
+    select, button {
+      margin: 10px;
+      padding: 8px;
+      font-size: 16px;
+    }
+    #game {
+      display: none;
+    }
+    .guess {
+      display: flex;
+      margin: 5px 0;
+    }
+    .letter {
+      width: 40px;
+      height: 40px;
+      border: 2px solid #ccc;
+      margin: 2px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      font-weight: bold;
+      background: white;
+    }
+    .correct {
+      background: green;
+      color: white;
+    }
+    .present {
+      background: orange;
+      color: white;
+    }
+    .absent {
+      background: grey;
+      color: white;
+    }
   </style>
 </head>
 <body>
-  <div id="root"></div>
+  <h1>Medical Wordle</h1>
+  
+  <div id="setup">
+    <label for="speciality">Choose Speciality:</label>
+    <select id="speciality">
+      <option value="medicine">Medicine</option>
+      <option value="orthopaedics">Orthopaedics</option>
+      <option value="neurology">Neurology</option>
+      <option value="cardiology">Cardiology</option>
+      <option value="pulmonology">Pulmonology</option>
+    </select>
+    <button id="startGame">Start Game</button>
+  </div>
+  
+  <div id="game">
+    <div id="guesses"></div>
+    <input type="text" id="guessInput" maxlength="5" />
+    <button id="submitGuess">Guess</button>
+    <p id="message"></p>
+  </div>
+  
   <script>
-    const {useState,useEffect} = React;
-
-    const COLORS = {
-      bg: getComputedStyle(document.documentElement).getPropertyValue('--bg').trim(),
-      tile: getComputedStyle(document.documentElement).getPropertyValue('--tile').trim(),
-      border: getComputedStyle(document.documentElement).getPropertyValue('--border').trim(),
-      text: getComputedStyle(document.documentElement).getPropertyValue('--text').trim(),
-      wrong: getComputedStyle(document.documentElement).getPropertyValue('--wrong').trim(),
-      present: getComputedStyle(document.documentElement).getPropertyValue('--present').trim(),
-      correct: getComputedStyle(document.documentElement).getPropertyValue('--correct').trim(),
-      key: getComputedStyle(document.documentElement).getPropertyValue('--key').trim(),
+    const wordLists = {
+      medicine: ["fever", "acute", "ulcer", "viral", "cough", "tumor"],
+      orthopaedics: ["femur", "joint", "brace", "screw", "plate", "tibia", "spine", "graft"],
+      neurology: ["brain", "nerve", "spasm", "focal", "tonic", "glial"],
+      cardiology: ["aorta", "valve", "pulse", "shock", "lumen"],
+      pulmonology: ["lungs", "cilia", "cough", "mucus"]
     };
-const MEDICAL_WORDS = ["acute", "edema", "ulcer", "renal", "nasal", "viral", "cough", "fever", "chest", "heart", "aorta", "valve", "blood", "optic", "nerve", "brain", "liver", "colon", "spine", "femur", "tibia", "ulnar", "ileum", "ileus", "lumen", "mucus", "vomit", "stool", "urine", "fecal", "anion", "lipid", "sebum", "shock", "tumor", "cysts", "polyp", "tinea", "apnea", "rales", "palsy", "ovary", "fetus", "labor", "serum", "graft", "donor", "gland", "vulva", "toxin", "urate", "croup", "sugar", "syrup", "salts", "doses", "dizzy", "drape", "drill", "drugs", "wound", "wrist", "wheal"];
 
+    let chosenWord = "";
+    let attempts = 0;
+    const maxAttempts = 6;
 
-    const SAFE_FALLBACK = ["acute","edema","ulcer","renal","nasal","viral","cough","fever","chest","heart"];
+    document.getElementById("startGame").addEventListener("click", () => {
+      const speciality = document.getElementById("speciality").value;
+      const words = wordLists[speciality];
+      chosenWord = words[Math.floor(Math.random() * words.length)];
+      console.log("DEBUG chosen word:", chosenWord); // remove in production
+      document.getElementById("setup").style.display = "none";
+      document.getElementById("game").style.display = "block";
+      document.getElementById("guesses").innerHTML = "";
+      document.getElementById("message").textContent = "";
+      attempts = 0;
+    });
 
-    function xmur3(str){let h=1779033703^str.length;for(let i=0;i<str.length;i++){h=Math.imul(h^str.charCodeAt(i),3432918353);h=(h<<13)|(h>>>19);}return function(){h=Math.imul(h^(h>>>16),2246822507);h=Math.imul(h^(h>>>13),3266489909);h^=h>>>16;return h>>>0;};}
-    function mulberry32(a){return function(){let t=(a+=0x6d2b79f5);t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;};}
-    function pickDailyWord(words, date){const yyyy=date.getUTCFullYear();const mm=date.getUTCMonth()+1;const dd=date.getUTCDate();const seed=xmur3(yyyy+'-'+mm+'-'+dd+'-juggle')();const rng=mulberry32(seed);const idx=Math.floor(rng()*words.length);return words[idx];}
-    function pickRandomWord(words){return words[Math.floor(Math.random()*words.length)];}
-
-    function scoreGuess(guess, answer){
-      const res=Array(5).fill("wrong"); const used=Array(5).fill(false);
-      for(let i=0;i<5;i++){ if(guess[i]===answer[i]){res[i]="correct"; used[i]=true;} }
-      for(let i=0;i<5;i++){ if(res[i]==="correct") continue;
-        for(let j=0;j<5;j++){ if(!used[j] && guess[i]===answer[j]){res[i]="present"; used[j]=true; break;} }
+    document.getElementById("submitGuess").addEventListener("click", () => {
+      const guess = document.getElementById("guessInput").value.toLowerCase();
+      if (guess.length !== 5) {
+        alert("Enter a 5-letter word");
+        return;
       }
-      return res;
-    }
 
-    const KEY_ROWS = [
-      ["q","w","e","r","t","y","u","i","o","p"],
-      ["a","s","d","f","g","h","j","k","l"],
-      ["enter","z","x","c","v","b","n","m","back"]
-    ];
+      attempts++;
+      const row = document.createElement("div");
+      row.classList.add("guess");
 
-    const LS_KEY="juggle:v1:stats";
-    const LS_MODE="juggle:v1:mode";
-    const LS_PUZZ="juggle:v1:today";
-
-    const defaultStats={games:0,wins:0,streak:0,bestStreak:0,dist:[0,0,0,0,0,0]};
-    function loadStats(){try{const raw=localStorage.getItem(LS_KEY);return raw?{...defaultStats,...JSON.parse(raw)}:defaultStats;}catch(e){return defaultStats;}}
-    function saveStats(s){localStorage.setItem(LS_KEY, JSON.stringify(s));}
-
-    function App(){
-      const WORDS = MEDICAL_WORDS.length? MEDICAL_WORDS: SAFE_FALLBACK;
-      const [mode,setMode] = useState(localStorage.getItem(LS_MODE) || "daily");
-      const todayKey = new Date().toISOString().slice(0,10);
-      const [dailyWord,setDailyWord] = useState(()=>{
-        const cached=localStorage.getItem(LS_PUZZ);
-        if(cached){ try{ const obj=JSON.parse(cached); if(obj.key===todayKey && obj.word) return obj.word; }catch(e){} }
-        const w = pickDailyWord(WORDS, new Date());
-        localStorage.setItem(LS_PUZZ, JSON.stringify({key:todayKey, word:w}));
-        return w;
-      });
-      const [answer,setAnswer] = useState(mode==="daily" ? dailyWord : pickRandomWord(WORDS));
-      const [rows,setRows] = useState(Array(6).fill(""));
-      const [states,setStates] = useState(Array(6).fill(Array(5).fill("empty")));
-      const [row,setRow] = useState(0);
-      const [col,setCol] = useState(0);
-      const [toast,setToast] = useState(null);
-      const [stats,setStats] = useState(loadStats());
-      const [gameOver,setGameOver] = useState({over:false, win:false});
-
-      useEffect(()=>{
-        const nextAns = mode==="daily" ? dailyWord : pickRandomWord(WORDS);
-        setAnswer(nextAns);
-        setRows(Array(6).fill(""));
-        setStates(Array(6).fill(Array(5).fill("empty")));
-        setRow(0); setCol(0); setGameOver({over:false, win:false});
-        localStorage.setItem(LS_MODE, mode);
-      },[mode,dailyWord]);
-
-      useEffect(()=>{
-        function onKey(e){
-          if(gameOver.over) return;
-          const k=e.key.toLowerCase();
-          if(k==="enter") handleEnter();
-          else if(k==="backspace") handleBack();
-          else if(/^[a-z]$/.test(k)) handleChar(k);
+      for (let i = 0; i < 5; i++) {
+        const letterBox = document.createElement("div");
+        letterBox.classList.add("letter");
+        letterBox.textContent = guess[i];
+        if (guess[i] === chosenWord[i]) {
+          letterBox.classList.add("correct");
+        } else if (chosenWord.includes(guess[i])) {
+          letterBox.classList.add("present");
+        } else {
+          letterBox.classList.add("absent");
         }
-        window.addEventListener("keydown", onKey);
-        return ()=> window.removeEventListener("keydown", onKey);
-      },[rows,row,col,gameOver]);
-
-      function handleChar(ch){
-        if(col>=5 || row>=6) return;
-        const next = rows.slice();
-        const cur = next[row];
-        next[row] = (cur + ch).slice(0,5);
-        setRows(next);
-        setCol(Math.min(5, col+1));
-      }
-      function handleBack(){
-        if(col===0) return;
-        const next = rows.slice();
-        next[row] = next[row].slice(0,col-1) + next[row].slice(col);
-        setRows(next);
-        setCol(col-1);
-      }
-      function ping(msg){ setToast(msg); setTimeout(()=>setToast(null), 1400); }
-
-      function handleEnter(){
-        const guess = (rows[row]||"").toLowerCase();
-        if(guess.length!==5) return ping("Enter a 5-letter word");
-        if(!/^[a-z]{5}$/.test(guess)) return ping("Letters only");
-        if(!WORDS.includes(guess)) ping("Not in medical list — allowed");
-        const score = scoreGuess(guess, answer);
-        const ns = states.slice(); ns[row]=score; setStates(ns);
-        if(guess===answer){ endGame(true,row); }
-        else if(row===5){ endGame(false,row); }
-        else { setRow(row+1); setCol(0); }
+        row.appendChild(letterBox);
       }
 
-      function endGame(win, attempt){
-        setGameOver({over:true, win});
-        const next={...stats};
-        next.games += 1;
-        if(win){ next.wins+=1; next.streak+=1; next.bestStreak=Math.max(next.bestStreak,next.streak); next.dist[attempt]=(next.dist[attempt]||0)+1;}
-        else { next.streak=0; }
-        setStats(next); saveStats(next);
+      document.getElementById("guesses").appendChild(row);
+
+      if (guess === chosenWord) {
+        document.getElementById("message").textContent = "You guessed it!";
+        document.getElementById("guessInput").disabled = true;
+        return;
       }
 
-      function share(){
-        const lines=[];
-        lines.push(`Juggle ${mode==="daily"? todayKey : "practice"}`);
-        lines.push(`${gameOver.win? (row+1):"X"}/6`);
-        for(let r=0;r<=row;r++){
-          const map=(states[r]||[]).map(s=> s==="correct"?"🟩": s==="present"?"🟨":"🟥").join("");
-          lines.push(map);
-        }
-        const out=lines.join("\n");
-        navigator.clipboard.writeText(out).then(()=> ping("Result copied"));
+      if (attempts >= maxAttempts) {
+        document.getElementById("message").textContent = `Out of tries! The word was ${chosenWord}.`;
+        document.getElementById("guessInput").disabled = true;
       }
 
-      function keyColor(k){
-        let state=""; // "", "wrong","present","correct"
-        for(let r=0;r<row;r++){
-          for(let c=0;c<5;c++){
-            if((rows[r]||"")[c]===k){
-              const st=(states[r]||[])[c];
-              if(st==="correct") return COLORS.correct;
-              if(st==="present") state="present";
-              else if(st==="wrong" && state!=="present") state="wrong";
-            }
-          }
-        }
-        if(state==="present") return COLORS.present;
-        if(state==="wrong") return COLORS.wrong;
-        return COLORS.key;
-      }
-
-      const headerWordCount = WORDS.length;
-
-      return React.createElement("div", {className:"min-h-screen w-full"},
-        React.createElement("div",{className:"mx-auto max-w-[640px] px-4 pb-10"},
-          // Header
-          React.createElement("header",{className:"sticky top-0 z-10", style:{background:COLORS.bg}},
-            React.createElement("div",{className:"flex items-center justify-between py-4 border-b", style:{borderColor:COLORS.border}},
-              React.createElement("h1",{className:"text-2xl font-extrabold tracking-tight"},"Juggle",
-                React.createElement("span",{className:"ml-2 text-sm font-medium opacity-70"},"medical wordle")
-              ),
-              React.createElement("div",{className:"flex items-center gap-2"},
-                React.createElement("button",{onClick:()=>alert('Guess the 5-letter medical word in 6 tries. Colors: green=correct, yellow=present, red=absent.'), className:"rounded-2xl px-3 py-2 text-sm hover:opacity-80 key"},"How"),
-                React.createElement("button",{onClick:()=>alert(`Played: ${stats.games}\nWin %: ${stats.games?Math.round((stats.wins/stats.games)*100):0}\nStreak: ${stats.streak}\nBest: ${stats.bestStreak}`), className:"rounded-2xl px-3 py-2 text-sm hover:opacity-80 key"},"Stats")
-              )
-            )
-          ),
-          // Mode
-          React.createElement("div",{className:"flex items-center justify-between py-3 text-sm opacity-80"},
-            React.createElement("div",null,"Mode: ",
-              React.createElement("button",{onClick:()=>setMode("daily"), className:`px-2 py-1 rounded-xl mr-2 ${mode==="daily"?"font-semibold":"opacity-70"}`, style:{background:COLORS.key}},"Daily"),
-              React.createElement("button",{onClick:()=>setMode("practice"), className:`px-2 py-1 rounded-xl ${mode==="practice"?"font-semibold":"opacity-70"}`, style:{background:COLORS.key}},"Practice")
-            ),
-            React.createElement("div",{className:"hidden sm:block"},"Word bank: ", React.createElement("span",{className:"font-semibold"}, String(headerWordCount) ), " curated medical words")
-          ),
-          // Grid
-          React.createElement("div",{className:"grid grid-rows-6 gap-2 my-4"},
-            Array.from({length:6}).map((_,r)=>
-              React.createElement("div",{key:r, className:"grid grid-cols-5 gap-2"},
-                Array.from({length:5}).map((__,c)=>{
-                  const ch=(rows[r]||'')[c]||'';
-                  const st=(states[r]||[])[c]||"empty";
-                  const cls = `tile rounded-xl aspect-square flex items-center justify-center text-2xl font-bold ${st!=="empty"?st:""}`;
-                  return React.createElement("div",{key:c, className:cls}, (ch||'').toUpperCase());
-                })
-              )
-            )
-          ),
-          // Keyboard
-          React.createElement("div",{className:"select-none"},
-            KEY_ROWS.map((rowKeys,i)=>
-              React.createElement("div",{key:i, className:"flex justify-center gap-2 mb-2"},
-                rowKeys.map(k=> React.createElement("button",{key:k, onClick:()=>{ if(k==="enter") handleEnter(); else if(k==="back") handleBack(); else handleChar(k); }, className:"rounded-2xl px-3 py-3 text-sm font-semibold uppercase key", style:{background:keyColor(k), minWidth: k.length>1? "68px":"36px", border:`1px solid ${COLORS.border}`}} , k==="back"?"⌫":k ))
-              )
-            )
-          ),
-          // Actions
-          React.createElement("div",{className:"flex items-center justify-between mt-4"},
-            React.createElement("button",{onClick:share, className:"rounded-2xl px-4 py-2 font-semibold hover:opacity-90 key"},"Share"),
-            React.createElement("button",{onClick:()=>setMode(mode==="daily"?"practice":"daily"), className:"rounded-2xl px-4 py-2 font-semibold hover:opacity-90 key"}, mode==="daily"?"Practice":"New Daily")
-          ),
-          React.createElement("footer",{className:"mt-8 text-xs opacity-60 text-center"}, "Built for clinicians. Colors: red = wrong, green = correct, yellow = present. © Parabox · Juggle v1"),
-          toast? React.createElement("div",{className:"fixed bottom-6 left-1/2 -translate-x-1/2 rounded-2xl px-4 py-2 text-sm shadow-soft key"}, toast) : null
-        )
-      );
-    }
-    const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(React.createElement(App));
+      document.getElementById("guessInput").value = "";
+    });
   </script>
 </body>
 </html>
