@@ -1,12 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Juggle — Medical Wordle</title>
+
+  <!-- React (UMD) -->
   <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+
+  <!-- Tailwind CDN for utility classes (optional) -->
   <script src="https://cdn.tailwindcss.com"></script>
+
   <style>
     :root{
       --bg:#f8f7f4;
@@ -18,327 +23,449 @@
       --correct:#6bcf8b;
       --key:#e9e6df;
     }
-    body{background:var(--bg); color:var(--text);}
+    html,body,#root{height:100%;}
+    body{
+      margin:0;
+      font-family:Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+      background:var(--bg);
+      color:var(--text);
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+    }
+
+    /* Tiles */
     .tile{background:var(--tile); border:1px solid var(--border);}
-    .tile.wrong{background:var(--wrong);}
-    .tile.present{background:var(--present);}
-    .tile.correct{background:var(--correct);}
+    .tile.wrong{background:var(--wrong); color:#3b1f1f;}
+    .tile.present{background:var(--present); color:#2b1b00;}
+    .tile.correct{background:var(--correct); color:#03310a;}
     .key{background:var(--key); border:1px solid var(--border);}
+
     .shadow-soft{box-shadow:0 10px 20px rgba(0,0,0,.06);}
+
+    /* Keyboard responsive improvements */
+    .keyboard {
+      display:flex;
+      flex-direction:column;
+      gap:0.4rem;
+      align-items:center;
+      padding:0.4rem 0;
+    }
+    .keyboard-row {
+      display:flex;
+      flex-wrap:wrap;           /* allow wrapping in narrow viewports */
+      justify-content:center;
+      gap:0.35rem;
+      width:100%;
+      max-width:640px;
+      padding:0 8px;
+    }
+    .key-button {
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      padding:0.5rem 0.6rem;
+      border-radius:14px;
+      user-select:none;
+      font-weight:700;
+      text-transform:uppercase;
+      min-width:34px;
+      max-width:48px;
+      flex:0 1 auto;           /* let keys shrink/grow but not disappear */
+    }
+    .key-button.wide { min-width:62px; max-width:120px; }
+    .key-button.tiny { min-width:28px; max-width:36px; font-size:0.85rem; padding:0.45rem 0.4rem; }
+
+    /* Keep q and enter visible: ensure last row's special keys remain wide but wrap when needed */
+    @media (max-width:520px){
+      .key-button { min-width:30px; max-width:40px; padding:0.42rem 0.36rem; font-size:0.92rem; }
+      .key-button.wide { min-width:54px; max-width:84px; }
+    }
+
+    /* Board styles */
+    .board { display:grid; grid-template-rows:repeat(6,1fr); gap:0.6rem; width:100%; max-width:420px; margin:0 auto; }
+    .board-row { display:grid; grid-template-columns:repeat(5, 1fr); gap:0.6rem; }
+    .tile {
+      aspect-ratio:1/1;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:1.75rem;
+      font-weight:800;
+      border-radius:12px;
+      letter-spacing:0.06em;
+    }
+
+    /* Toast */
+    .toast {
+      position:fixed;
+      left:50%;
+      transform:translateX(-50%);
+      bottom:20px;
+      background:white;
+      border-radius:12px;
+      padding:8px 14px;
+      box-shadow:0 8px 24px rgba(16,24,40,0.12);
+      font-weight:600;
+      z-index:60;
+    }
+
+    /* Header sticky background handling */
+    header.sticky {
+      position:sticky;
+      top:0;
+      backdrop-filter: blur(6px);
+      z-index:40;
+    }
+
+    /* Small screens: reduce header sizing */
+    @media (max-width:420px){
+      .tile { font-size:1.4rem; }
+    }
+
+    /* Simple utility */
+    .hidden-sm { display:none; }
+    @media (min-width:640px){ .hidden-sm{ display:inline; } }
   </style>
 </head>
 <body>
   <div id="root"></div>
+
   <script>
-    const {useState,useEffect,useMemo} = React;
+    (function(){
+      const { useState, useEffect, useMemo } = React;
 
-    const COLORS = {
-      bg: getComputedStyle(document.documentElement).getPropertyValue('--bg').trim(),
-      tile: getComputedStyle(document.documentElement).getPropertyValue('--tile').trim(),
-      border: getComputedStyle(document.documentElement).getPropertyValue('--border').trim(),
-      text: getComputedStyle(document.documentElement).getPropertyValue('--text').trim(),
-      wrong: getComputedStyle(document.documentElement).getPropertyValue('--wrong').trim(),
-      present: getComputedStyle(document.documentElement).getPropertyValue('--present').trim(),
-      correct: getComputedStyle(document.documentElement).getPropertyValue('--correct').trim(),
-      key: getComputedStyle(document.documentElement).getPropertyValue('--key').trim(),
-    };
+      /* --- Config / Word lists --- */
+      const SPECIALITY_WORDS = {
+        medicine: ["fever","acute","ulcer","viral","cough","tumor"],
+        orthopaedics: ["femur","joint","brace","screw","plate","tibia","spine","graft"],
+        neurology: ["brain","nerve","spasm","focal","tonic","glial"],
+        cardiology: ["aorta","valve","pulse","shock","lumen"],
+        pulmonology: ["lungs","cilia","cough","mucus"]
+      };
 
-    // --- SPECIALITY WORD LISTS (exact lists you provided) ---
-    const SPECIALITY_WORDS = {
-      medicine: ["fever","acute","ulcer","viral","cough","tumor"],
-      orthopaedics: ["femur","joint","brace","screw","plate","tibia","spine","graft"],
-      neurology: ["brain","nerve","spasm","focal","tonic","glial"],
-      cardiology: ["aorta","valve","pulse","shock","lumen"],
-      pulmonology: ["lungs","cilia","cough","mucus"]
-    };
-
-    // fallback in case (shouldn't be used once a speciality is chosen)
-    const SAFE_FALLBACK = ["fever","acute","ulcer","viral","cough","tumor"];
-
-    // Deterministic daily picker helpers (seeded by date + speciality)
-    function xmur3(str){let h=1779033703^str.length;for(let i=0;i<str.length;i++){h=Math.imul(h^str.charCodeAt(i),3432918353);h=(h<<13)|(h>>>19);}return function(){h=Math.imul(h^(h>>>16),2246822507);h=Math.imul(h^(h>>>13),3266489909);h^=h>>>16;return h>>>0;};}
-    function mulberry32(a){return function(){let t=(a+=0x6d2b79f5);t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;};}
-    function pickDailyWord(words, date, speciality){
-      if(!words || words.length===0) return null;
-      const yyyy=date.getUTCFullYear(); const mm=date.getUTCMonth()+1; const dd=date.getUTCDate();
-      const seed = xmur3(`${yyyy}-${mm}-${dd}-${speciality}-juggle`)();
-      const rng = mulberry32(seed);
-      const idx = Math.floor(rng()*words.length);
-      return words[idx];
-    }
-    function pickRandomWord(words){
-      return words[Math.floor(Math.random()*words.length)];
-    }
-
-    function scoreGuess(guess, answer){
-      const res=Array(5).fill("wrong"); const used=Array(5).fill(false);
-      for(let i=0;i<5;i++){ if(guess[i]===answer[i]){res[i]="correct"; used[i]=true;} }
-      for(let i=0;i<5;i++){ if(res[i]==="correct") continue;
-        for(let j=0;j<5;j++){ if(!used[j] && guess[i]===answer[j]){res[i]="present"; used[j]=true; break;} }
+      /* deterministic daily pick helpers */
+      function xmur3(str){
+        let h = 1779033703 ^ str.length;
+        for (let i=0;i<str.length;i++){
+          h = Math.imul(h ^ str.charCodeAt(i), 3432918353);
+          h = (h << 13) | (h >>> 19);
+        }
+        return function(){
+          h = Math.imul(h ^ (h >>> 16), 2246822507);
+          h = Math.imul(h ^ (h >>> 13), 3266489909);
+          h ^= h >>> 16;
+          return h >>> 0;
+        };
       }
-      return res;
-    }
+      function mulberry32(a){
+        return function(){
+          let t = (a += 0x6d2b79f5);
+          t = Math.imul(t ^ (t >>> 15), t | 1);
+          t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+      }
+      function pickDailyWord(words, date, speciality){
+        if(!words || words.length===0) return null;
+        const yyyy = date.getUTCFullYear();
+        const mm = date.getUTCMonth()+1;
+        const dd = date.getUTCDate();
+        const seed = xmur3(`${yyyy}-${mm}-${dd}-${speciality}-juggle`)();
+        const rng = mulberry32(seed);
+        return words[Math.floor(rng()*words.length)];
+      }
+      function pickRandomWord(words){
+        if(!words || words.length===0) return null;
+        return words[Math.floor(Math.random()*words.length)];
+      }
 
-    const KEY_ROWS = [
-      ["q","w","e","r","t","y","u","i","o","p"],
-      ["a","s","d","f","g","h","j","k","l"],
-      ["enter","z","x","c","v","b","n","m","back"]
-    ];
+      function scoreGuess(guess, answer){
+        // returns array of "correct"|"present"|"wrong"
+        const res = Array(5).fill("wrong");
+        const used = Array(5).fill(false);
+        for(let i=0;i<5;i++){
+          if(guess[i] === answer[i]) { res[i] = "correct"; used[i]=true; }
+        }
+        for(let i=0;i<5;i++){
+          if(res[i] === "correct") continue;
+          for(let j=0;j<5;j++){
+            if(!used[j] && guess[i] === answer[j]) { res[i] = "present"; used[j]=true; break; }
+          }
+        }
+        return res;
+      }
 
-    const LS_KEY="juggle:v1:stats";
-    const LS_MODE="juggle:v1:mode";
-    const LS_PUZZ="juggle:v1:today"; // we will append speciality -> LS_PUZZ + ':' + speciality
+      const KEY_ROWS = [
+        ["q","w","e","r","t","y","u","i","o","p"],
+        ["a","s","d","f","g","h","j","k","l"],
+        ["enter","z","x","c","v","b","n","m","back"]
+      ];
 
-    const defaultStats={games:0,wins:0,streak:0,bestStreak:0,dist:[0,0,0,0,0,0]};
-    function loadStats(){try{const raw=localStorage.getItem(LS_KEY);return raw?{...defaultStats,...JSON.parse(raw)}:defaultStats;}catch(e){return defaultStats;}}
-    function saveStats(s){localStorage.setItem(LS_KEY, JSON.stringify(s));}
+      const LS_KEY = "juggle:v1:stats";
+      const LS_MODE = "juggle:v1:mode";
+      const LS_PUZZ = "juggle:v1:today";
 
-    function App(){
-      // NEW: user must pick a speciality first
-      const [speciality, setSpeciality] = useState(null);
+      const defaultStats = { games:0, wins:0, streak:0, bestStreak:0, dist:[0,0,0,0,0,0] };
+      function loadStats(){ try { const r = localStorage.getItem(LS_KEY); return r ? {...defaultStats, ...JSON.parse(r)} : defaultStats; } catch(e){ return defaultStats; } }
+      function saveStats(s){ try { localStorage.setItem(LS_KEY, JSON.stringify(s)); } catch(e){} }
 
-      // derived set of valid words (only from chosen speciality)
-      const WORDS = useMemo(()=> speciality ? SPECIALITY_WORDS[speciality] : [], [speciality]);
+      /* --- App --- */
+      function App(){
+        const [speciality, setSpeciality] = useState(null);
+        const WORDS = useMemo(()=> speciality ? SPECIALITY_WORDS[speciality] : [], [speciality]);
+        const [mode, setMode] = useState(localStorage.getItem(LS_MODE) || "daily");
+        const todayKey = new Date().toISOString().slice(0,10);
 
-      const [mode,setMode] = useState(localStorage.getItem(LS_MODE) || "daily");
-      const todayKey = new Date().toISOString().slice(0,10);
+        const [dailyWord, setDailyWord] = useState(null);
+        const [answer, setAnswer] = useState("");
+        const [rows, setRows] = useState(Array(6).fill(""));
+        const [states, setStates] = useState(Array(6).fill(Array(5).fill("empty")));
+        const [row, setRow] = useState(0);
+        const [col, setCol] = useState(0);
+        const [toast, setToast] = useState(null);
+        const [stats, setStats] = useState(loadStats());
+        const [gameOver, setGameOver] = useState({ over:false, win:false });
+        const [revealAnswer, setRevealAnswer] = useState(null);
 
-      // dailyWord & answer will be set only AFTER speciality is chosen
-      const [dailyWord,setDailyWord] = useState(null);
-      const [answer,setAnswer] = useState("");
-      const [rows,setRows] = useState(Array(6).fill(""));
-      const [states,setStates] = useState(Array(6).fill(Array(5).fill("empty")));
-      const [row,setRow] = useState(0);
-      const [col,setCol] = useState(0);
-      const [toast,setToast] = useState(null);
-      const [stats,setStats] = useState(loadStats());
-      const [gameOver,setGameOver] = useState({over:false, win:false});
-      const [revealAnswer, setRevealAnswer] = useState(null);
+        /* initialize answer when speciality or mode changes */
+        useEffect(()=>{
+          if(!speciality) return;
+          const PUZZ_KEY = `${LS_PUZZ}:${speciality}`;
+          let daily = null;
+          try{
+            const cached = localStorage.getItem(PUZZ_KEY);
+            if(cached){
+              const obj = JSON.parse(cached);
+              if(obj && obj.key === todayKey && obj.word && WORDS.includes(obj.word)){
+                daily = obj.word;
+              }
+            }
+          }catch(e){}
+          if(!daily && mode === "daily"){
+            daily = pickDailyWord(WORDS, new Date(), speciality);
+            try{ localStorage.setItem(PUZZ_KEY, JSON.stringify({ key: todayKey, word: daily })); }catch(e){}
+          }
+          const nextAnswer = mode === "daily" ? daily : pickRandomWord(WORDS);
+          setDailyWord(daily);
+          setAnswer(nextAnswer || "");
+          setRows(Array(6).fill(""));
+          setStates(Array(6).fill(Array(5).fill("empty")));
+          setRow(0); setCol(0);
+          setGameOver({ over:false, win:false});
+          setRevealAnswer(null);
+          try{ localStorage.setItem(LS_MODE, mode); }catch(e){}
+        }, [speciality, mode, todayKey]);
 
-      // When speciality or mode changes, initialize the game's answer properly (and ONLY from that speciality)
-      useEffect(()=>{
+        /* keyboard events (physical keyboard) */
+        useEffect(()=>{
+          function onKey(e){
+            if(gameOver.over || !speciality) return;
+            const k = e.key.toLowerCase();
+            if(k === "enter") handleEnter();
+            else if(k === "backspace") handleBack();
+            else if(/^[a-z]$/.test(k)) handleChar(k);
+          }
+          window.addEventListener("keydown", onKey);
+          return ()=> window.removeEventListener("keydown", onKey);
+        }, [rows,row,col,gameOver,speciality]);
+
+        function ping(msg){
+          setToast(msg);
+          setTimeout(()=> setToast(null), 1400);
+        }
+
+        function handleChar(ch){
+          if(col >= 5 || row >= 6 || gameOver.over) return;
+          const next = rows.slice();
+          next[row] = (next[row] + ch).slice(0,5);
+          setRows(next);
+          setCol(Math.min(5, col+1));
+        }
+
+        function handleBack(){
+          if(col === 0 || gameOver.over) return;
+          const next = rows.slice();
+          next[row] = next[row].slice(0, col-1);
+          setRows(next);
+          setCol(col-1);
+        }
+
+        function handleEnter(){
+          if(!speciality || gameOver.over) return;
+          const guess = (rows[row]||"").toLowerCase();
+          if(guess.length !== 5) return ping("Enter a 5-letter word");
+          if(!/^[a-z]{5}$/.test(guess)) return ping("Letters only");
+          if(!answer || answer.length !== 5) {
+            // safety: if answer not set (no words in speciality), notify
+            ping("No valid answer available for this speciality.");
+            return;
+          }
+
+          const score = scoreGuess(guess, answer);
+          const ns = states.slice();
+          ns[row] = score;
+          setStates(ns);
+
+          if(guess === answer){
+            endGame(true, row);
+          } else if(row === 5){
+            setRevealAnswer(answer);
+            endGame(false, row);
+          } else {
+            setRow(row+1);
+            setCol(0);
+          }
+        }
+
+        function endGame(win, attempt){
+          setGameOver({ over:true, win });
+          const next = {...stats};
+          next.games += 1;
+          if(win){
+            next.wins += 1;
+            next.streak += 1;
+            next.bestStreak = Math.max(next.bestStreak, next.streak);
+            next.dist[attempt] = (next.dist[attempt] || 0) + 1;
+          } else {
+            next.streak = 0;
+          }
+          setStats(next);
+          saveStats(next);
+        }
+
+        function share(){
+          const lines = [];
+          lines.push(`Juggle ${mode === "daily" ? todayKey : "practice"}`);
+          lines.push(`${gameOver.win ? (row+1) : "X"}/6`);
+          for(let r=0;r<=row;r++){
+            const map = (states[r]||[]).map(s=> s==="correct" ? "🟩" : s==="present" ? "🟨" : "🟥").join("");
+            lines.push(map);
+          }
+          const out = lines.join("\n");
+          navigator.clipboard.writeText(out).then(()=> ping("Result copied"));
+        }
+
+        function keyColor(k){
+          // compute best known color for key based on previous rows
+          let state = "";
+          for(let r=0;r<row;r++){
+            for(let c=0;c<5;c++){
+              if((rows[r]||"")[c] === k){
+                const st = (states[r]||[])[c];
+                if(st === "correct") return getComputedStyle(document.documentElement).getPropertyValue('--correct').trim();
+                if(st === "present") state = "present";
+                else if(st === "wrong" && state !== "present") state = "wrong";
+              }
+            }
+          }
+          if(state === "present") return getComputedStyle(document.documentElement).getPropertyValue('--present').trim();
+          if(state === "wrong") return getComputedStyle(document.documentElement).getPropertyValue('--wrong').trim();
+          return getComputedStyle(document.documentElement).getPropertyValue('--key').trim();
+        }
+
         if(!speciality){
-          // keep UI on selection screen
-          return;
+          // selection screen
+          return React.createElement("div", { className: "min-h-screen flex flex-col items-center justify-center px-4" },
+            React.createElement("div", { className: "text-center" },
+              React.createElement("h1", { className: "text-2xl font-extrabold mb-3" }, "Choose Speciality"),
+              React.createElement("p", { className: "text-sm opacity-70 mb-4" }, "Pick a speciality to start the daily Juggle word."),
+              React.createElement("div", { className: "flex flex-wrap justify-center gap-3" },
+                Object.keys(SPECIALITY_WORDS).map(spec =>
+                  React.createElement("button", {
+                    key: spec,
+                    onClick: ()=> setSpeciality(spec),
+                    className: "px-4 py-2 rounded-2xl key hover:opacity-90 font-semibold shadow-soft"
+                  }, spec.charAt(0).toUpperCase() + spec.slice(1))
+                )
+              ),
+              React.createElement("div", { className: "mt-6 text-xs opacity-70" }, "You can switch between Daily and Practice modes inside the game.")
+            )
+          );
         }
 
-        // Choose or restore daily word for this speciality
-        const PUZZ_KEY = `${LS_PUZZ}:${speciality}`;
-        let daily = null;
-        try{
-          const cached = localStorage.getItem(PUZZ_KEY);
-          if(cached){
-            const obj = JSON.parse(cached);
-            if(obj && obj.key === todayKey && obj.word && WORDS.includes(obj.word)){
-              daily = obj.word;
-            }
-          }
-        }catch(e){ /* ignore parse errors */ }
+        const headerWordCount = WORDS.length;
 
-        if(!daily && mode==="daily"){
-          daily = pickDailyWord(WORDS, new Date(), speciality);
-          // store
-          try{ localStorage.setItem(PUZZ_KEY, JSON.stringify({key:todayKey, word:daily})); }catch(e){}
-        }
+        return React.createElement("div", { className: "min-h-screen w-full flex flex-col items-center" },
+          React.createElement("div", { className: "w-full max-w-[820px] px-4 pb-14" },
+            React.createElement("header", { className: "sticky top-0 z-30 bg-opacity-80 sticky", style: { background: getComputedStyle(document.documentElement).getPropertyValue('--bg').trim(), borderBottom: `1px solid ${getComputedStyle(document.documentElement).getPropertyValue('--border').trim()}` } },
+              React.createElement("div", { className: "flex items-center justify-between py-4" },
+                React.createElement("h1", { className: "text-2xl font-extrabold tracking-tight" }, "Juggle",
+                  React.createElement("span", { className: "ml-2 text-sm font-medium opacity-70" }, "medical wordle")
+                ),
+                React.createElement("div", { className: "flex items-center gap-3" },
+                  React.createElement("button", { onClick: ()=> alert('Guess the 5-letter word in 6 tries.\nGreen = correct, Yellow = present, Red = absent.'), className: "rounded-2xl px-3 py-2 text-sm hover:opacity-80 key" }, "How"),
+                  React.createElement("button", { onClick: ()=> alert(`Played: ${stats.games}\nWin %: ${stats.games ? Math.round((stats.wins/stats.games)*100) : 0}\nStreak: ${stats.streak}\nBest: ${stats.bestStreak}`), className: "rounded-2xl px-3 py-2 text-sm hover:opacity-80 key" }, "Stats")
+                )
+              )
+            ),
 
-        const nextAnswer = mode==="daily" ? daily : pickRandomWord(WORDS);
-        setDailyWord(daily);
-        setAnswer(nextAnswer || ""); // set answer only from speciality set
-        // reset board state
-        setRows(Array(6).fill(""));
-        setStates(Array(6).fill(Array(5).fill("empty")));
-        setRow(0); setCol(0); setGameOver({over:false, win:false});
-        setRevealAnswer(null);
-        // persist mode
-        try{ localStorage.setItem(LS_MODE, mode); }catch(e){}
-      },[speciality, mode, todayKey]); // re-run when speciality or mode changes
+            React.createElement("div", { className: "flex items-center justify-between py-3 text-sm opacity-80" },
+              React.createElement("div", null, "Mode: ",
+                React.createElement("button", { onClick: ()=> setMode("daily"), className: `px-2 py-1 rounded-xl mr-2 ${mode === "daily" ? "font-semibold" : "opacity-70"}`, style: { background: getComputedStyle(document.documentElement).getPropertyValue('--key').trim() } }, "Daily"),
+                React.createElement("button", { onClick: ()=> setMode("practice"), className: `px-2 py-1 rounded-xl ${mode === "practice" ? "font-semibold" : "opacity-70"}`, style: { background: getComputedStyle(document.documentElement).getPropertyValue('--key').trim() } }, "Practice")
+              ),
+              React.createElement("div", { className: "hidden-sm" }, "Speciality: ",
+                React.createElement("span", { className: "font-semibold" }, speciality.charAt(0).toUpperCase() + speciality.slice(1)),
+                " · Words: ",
+                React.createElement("span", { className: "font-semibold" }, String(headerWordCount))
+              )
+            ),
 
-      // keyboard events: only active after speciality chosen and game not over
-      useEffect(()=>{
-        function onKey(e){
-          if(gameOver.over || !speciality) return;
-          const k = e.key.toLowerCase();
-          if(k==="enter") handleEnter();
-          else if(k==="backspace") handleBack();
-          else if(/^[a-z]$/.test(k)) handleChar(k);
-        }
-        window.addEventListener("keydown", onKey);
-        return ()=> window.removeEventListener("keydown", onKey);
-      },[rows,row,col,gameOver,speciality]);
+            // Board
+            React.createElement("div", { className: "board my-4" },
+              Array.from({length:6}).map((_, r) =>
+                React.createElement("div", { key: r, className: "board-row" },
+                  Array.from({length:5}).map((_, c) => {
+                    const ch = (rows[r]||'')[c] || '';
+                    const st = (states[r]||[])[c] || "empty";
+                    const cls = "tile rounded-xl " + (st !== "empty" ? st : "");
+                    return React.createElement("div", { key:c, className: cls }, (ch || '').toUpperCase());
+                  })
+                )
+              )
+            ),
 
-      function handleChar(ch){
-        if(col>=5 || row>=6 || gameOver.over) return;
-        const next = rows.slice();
-        next[row] = (next[row] + ch).slice(0,5);
-        setRows(next);
-        setCol(Math.min(5, col+1));
-      }
-      function handleBack(){
-        if(col===0 || gameOver.over) return;
-        const next = rows.slice();
-        next[row] = next[row].slice(0,col-1);
-        setRows(next);
-        setCol(col-1);
-      }
-      function ping(msg){ setToast(msg); setTimeout(()=>setToast(null), 1400); }
+            // Reveal answer when lost
+            (gameOver.over && !gameOver.win && revealAnswer) ? React.createElement("div", { className: "text-center text-lg font-bold text-red-600 mb-4" }, `The word was: ${revealAnswer.toUpperCase()}`) : null,
 
-      function handleEnter(){
-        if(!speciality || gameOver.over) return; // safety
-        const guess = (rows[row]||"").toLowerCase();
-        if(guess.length!==5) return ping("Enter a 5-letter word");
-        if(!/^[a-z]{5}$/.test(guess)) return ping("Letters only");
-        // STRICT check: only allow guesses from the chosen speciality
-        if(!WORDS.includes(guess)) { ping("Not in speciality list"); return; }
+            // Keyboard (responsive)
+            React.createElement("div", { className: "keyboard" },
+              KEY_ROWS.map((rowKeys, i) =>
+                React.createElement("div", { key:i, className: "keyboard-row" },
+                  rowKeys.map(k => {
+                    const isWide = k.length > 1;
+                    const btnClass = "key-button " + (isWide ? "wide" : "");
+                    const label = k === "back" ? "⌫" : k;
+                    return React.createElement("button", {
+                      key:k,
+                      onClick: ()=> { if(k === "enter") handleEnter(); else if(k === "back") handleBack(); else handleChar(k); },
+                      className: btnClass + " rounded-2xl font-semibold key",
+                      style: { background: keyColor(k), border: `1px solid ${getComputedStyle(document.documentElement).getPropertyValue('--border').trim()}` }
+                    }, label);
+                  })
+                )
+              )
+            ),
 
-        const score = scoreGuess(guess, answer);
-        const ns = states.slice(); ns[row]=score; setStates(ns);
+            // Actions
+            React.createElement("div", { className: "flex items-center justify-between mt-4" },
+              React.createElement("div", null,
+                React.createElement("button", { onClick: share, className: "rounded-2xl px-4 py-2 font-semibold hover:opacity-90 key mr-3" }, "Share"),
+                React.createElement("button", { onClick: ()=> { setMode(mode === "daily" ? "practice" : "daily"); }, className: "rounded-2xl px-4 py-2 font-semibold hover:opacity-90 key" }, mode === "daily" ? "Practice" : "New Daily")
+              ),
+              React.createElement("div", { className: "text-xs opacity-70" }, "© Parabox · Juggle v1")
+            ),
 
-        if(guess===answer){
-          endGame(true,row);
-        } else if(row===5){
-          // final guess used and wrong → reveal answer automatically
-          setRevealAnswer(answer);
-          endGame(false,row);
-        } else {
-          setRow(row+1);
-          setCol(0);
-        }
-      }
-
-      function endGame(win, attempt){
-        setGameOver({over:true, win});
-        const next={...stats};
-        next.games += 1;
-        if(win){
-          next.wins+=1;
-          next.streak+=1;
-          next.bestStreak=Math.max(next.bestStreak,next.streak);
-          next.dist[attempt] = (next.dist[attempt]||0) + 1;
-        } else {
-          next.streak = 0;
-        }
-        setStats(next); saveStats(next);
-      }
-
-      function share(){
-        const lines=[];
-        lines.push(`Juggle ${mode==="daily"? todayKey : "practice"}`);
-        lines.push(`${gameOver.win? (row+1):"X"}/6`);
-        for(let r=0;r<=row;r++){
-          const map=(states[r]||[]).map(s=> s==="correct"?"🟩": s==="present"?"🟨":"🟥").join("");
-          lines.push(map);
-        }
-        const out = lines.join("\n");
-        navigator.clipboard.writeText(out).then(()=> ping("Result copied"));
-      }
-
-      function keyColor(k){
-        let state=""; // "", "wrong","present","correct"
-        for(let r=0;r<row;r++){
-          for(let c=0;c<5;c++){
-            if((rows[r]||"")[c]===k){
-              const st=(states[r]||[])[c];
-              if(st==="correct") return COLORS.correct;
-              if(st==="present") state="present";
-              else if(st==="wrong" && state!=="present") state="wrong";
-            }
-          }
-        }
-        if(state==="present") return COLORS.present;
-        if(state==="wrong") return COLORS.wrong;
-        return COLORS.key;
-      }
-
-      // If speciality not chosen yet, show the selection overlay (keeps UI flow as requested)
-      if (!speciality) {
-        return React.createElement("div",{className:"min-h-screen flex flex-col items-center justify-center"},
-          React.createElement("h1",{className:"text-2xl font-bold mb-4"},"Choose Speciality"),
-          Object.keys(SPECIALITY_WORDS).map(spec =>
-            React.createElement("button",{
-              key:spec,
-              onClick:()=>{
-                setSpeciality(spec);
-              },
-              className:"px-4 py-2 m-2 rounded-2xl key hover:opacity-80 font-semibold"
-            }, spec.charAt(0).toUpperCase()+spec.slice(1))
+            // Toast
+            toast ? React.createElement("div", { className: "toast" }, toast) : null
           )
         );
       }
 
-      const headerWordCount = WORDS.length;
-
-      return React.createElement("div", {className:"min-h-screen w-full"},
-        React.createElement("div",{className:"mx-auto max-w-[640px] px-4 pb-10"},
-          // Header
-          React.createElement("header",{className:"sticky top-0 z-10", style:{background:COLORS.bg}},
-            React.createElement("div",{className:"flex items-center justify-between py-4 border-b", style:{borderColor:COLORS.border}},
-              React.createElement("h1",{className:"text-2xl font-extrabold tracking-tight"},"Juggle",
-                React.createElement("span",{className:"ml-2 text-sm font-medium opacity-70"},"medical wordle")
-              ),
-              React.createElement("div",{className:"flex items-center gap-2"},
-                React.createElement("button",{onClick:()=>alert('Guess the 5-letter word in 6 tries. Colors: green=correct, yellow=present, red=absent.'), className:"rounded-2xl px-3 py-2 text-sm hover:opacity-80 key"},"How"),
-                React.createElement("button",{onClick:()=>alert(`Played: ${stats.games}\nWin %: ${stats.games?Math.round((stats.wins/stats.games)*100):0}\nStreak: ${stats.streak}\nBest: ${stats.bestStreak}`), className:"rounded-2xl px-3 py-2 text-sm hover:opacity-80 key"},"Stats")
-              )
-            )
-          ),
-          // Mode & speciality info
-          React.createElement("div",{className:"flex items-center justify-between py-3 text-sm opacity-80"},
-            React.createElement("div",null,"Mode: ",
-              React.createElement("button",{onClick:()=>setMode("daily"), className:`px-2 py-1 rounded-xl mr-2 ${mode==="daily"?"font-semibold":"opacity-70"}`, style:{background:COLORS.key}},"Daily"),
-              React.createElement("button",{onClick:()=>setMode("practice"), className:`px-2 py-1 rounded-xl ${mode==="practice"?"font-semibold":"opacity-70"}`, style:{background:COLORS.key}},"Practice")
-            ),
-            React.createElement("div",{className:"hidden sm:block"},"Speciality: ", React.createElement("span",{className:"font-semibold"}, speciality.charAt(0).toUpperCase()+speciality.slice(1) ), " · Words: ", React.createElement("span",{className:"font-semibold"}, String(headerWordCount) ))
-          ),
-          // Grid
-          React.createElement("div",{className:"grid grid-rows-6 gap-2 my-4"},
-            Array.from({length:6}).map((_,r)=>
-              React.createElement("div",{key:r, className:"grid grid-cols-5 gap-2"},
-                Array.from({length:5}).map((__,c)=>{
-                  const ch=(rows[r]||'')[c]||'';
-                  const st=(states[r]||[])[c]||"empty";
-                  const cls = `tile rounded-xl aspect-square flex items-center justify-center text-2xl font-bold ${st!=="empty"?st:""}`;
-                  return React.createElement("div",{key:c, className:cls}, (ch||'').toUpperCase());
-                })
-              )
-            )
-          ),
-
-          // Reveal Answer if lost (auto-shown after final wrong guess)
-          (gameOver.over && !gameOver.win && revealAnswer) ? 
-            React.createElement("div",{className:"text-center text-lg font-bold text-red-600 mb-4"}, 
-              `The word was: ${revealAnswer.toUpperCase()}`
-            ) 
-          : null,
-
-          // Keyboard
-          React.createElement("div",{className:"select-none"},
-            KEY_ROWS.map((rowKeys,i)=>
-              React.createElement("div",{key:i, className:"flex justify-center gap-2 mb-2"},
-                rowKeys.map(k=> React.createElement("button",{
-                  key:k, onClick:()=>{ if(k==="enter") handleEnter(); else if(k==="back") handleBack(); else handleChar(k); },
-                  className:"rounded-2xl px-3 py-3 text-sm font-semibold uppercase key",
-                  style:{background:keyColor(k), minWidth: k.length>1? "68px":"36px", border:`1px solid ${COLORS.border}`}
-                }, k==="back"?"⌫":k ))
-              )
-            )
-          ),
-          // Actions
-          React.createElement("div",{className:"flex items-center justify-between mt-4"},
-            React.createElement("button",{onClick:share, className:"rounded-2xl px-4 py-2 font-semibold hover:opacity-90 key"},"Share"),
-            React.createElement("button",{onClick:()=>{
-              // Toggle mode to force new random / daily re-init
-              setMode(mode==="daily"?"practice":"daily");
-            }, className:"rounded-2xl px-4 py-2 font-semibold hover:opacity-90 key"}, mode==="daily"?"Practice":"New Daily")
-          ),
-          // Footer + toast
-          React.createElement("footer",{className:"mt-8 text-xs opacity-60 text-center"}, "Built for clinicians. Colors: red = wrong, green = correct, yellow = present. © Parabox · Juggle v1"),
-          toast? React.createElement("div",{className:"fixed bottom-6 left-1/2 -translate-x-1/2 rounded-2xl px-4 py-2 text-sm shadow-soft key"}, toast) : null
-        )
-      );
-    }
-
-    const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(React.createElement(App));
+      // Render
+      const root = ReactDOM.createRoot(document.getElementById('root'));
+      root.render(React.createElement(App));
+    })();
   </script>
 </body>
 </html>
