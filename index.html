@@ -9,19 +9,52 @@
   <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
 
-  <!-- Tailwind CDN for utility classes (optional) -->
+  <!-- Tailwind CDN (fine for testing; we can switch to CLI for prod) -->
   <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Firebase (Compat SDKs) -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+  <!-- Inline favicon to avoid 404 -->
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>🩺</text></svg>">
+
+  <script>
+    // Firebase config (single, correct block)
+    const firebaseConfig = {
+      apiKey: "AIzaSyBhdX17-ix9owKPa5zaLmabjLpP8KP41bo",
+      authDomain: "juggle-prod-4f700.firebaseapp.com",
+      projectId: "juggle-prod-4f700",
+      storageBucket: "juggle-prod-4f700.appspot.com", // <- appspot.com is correct
+      messagingSenderId: "296571133757",
+      appId: "1:296571133757:web:d3d25aad08895f24262f54",
+      measurementId: "G-XGLQ5ZJVM8"
+    };
+
+    // Initialize Firebase once
+    (function () {
+      if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+      } else {
+        firebase.app();
+      }
+      // Expose globals (optional)
+      window.auth = firebase.auth();
+      window.db   = firebase.firestore();
+    })();
+  </script>
 
   <style>
     :root{
-      --bg:#f8f7f4;
-      --tile:#f0eee9;
-      --border:#d7d3ca;
-      --text:#1f2937;
-      --wrong:#e9a5a5;
-      --present:#f6d26b;
-      --correct:#6bcf8b;
-      --key:#e9e6df;
+      --bg:#f8f7f4;      /* off-white background */
+      --tile:#f0eee9;    /* tile base */
+      --border:#d7d3ca;  /* subtle border */
+      --text:#1f2937;    /* slate-800 text */
+      --wrong:#e9a5a5;   /* red-ish for wrong */
+      --present:#f6d26b; /* yellow for present */
+      --correct:#6bcf8b; /* green for correct */
+      --key:#e9e6df;     /* keyboard key bg */
     }
     html,body,#root{height:100%;}
     body{
@@ -42,87 +75,28 @@
 
     .shadow-soft{box-shadow:0 10px 20px rgba(0,0,0,.06);}
 
-    /* Keyboard responsive improvements */
-    .keyboard {
-      display:flex;
-      flex-direction:column;
-      gap:0.4rem;
-      align-items:center;
-      padding:0.4rem 0;
-    }
-    .keyboard-row {
-      display:flex;
-      flex-wrap:wrap;           /* allow wrapping in narrow viewports */
-      justify-content:center;
-      gap:0.35rem;
-      width:100%;
-      max-width:640px;
-      padding:0 8px;
-    }
-    .key-button {
-      display:inline-flex;
-      align-items:center;
-      justify-content:center;
-      padding:0.5rem 0.6rem;
-      border-radius:14px;
-      user-select:none;
-      font-weight:700;
-      text-transform:uppercase;
-      min-width:34px;
-      max-width:48px;
-      flex:0 1 auto;           /* let keys shrink/grow but not disappear */
-    }
+    /* Keyboard responsive */
+    .keyboard { display:flex; flex-direction:column; gap:0.4rem; align-items:center; padding:0.4rem 0; }
+    .keyboard-row { display:flex; flex-wrap:wrap; justify-content:center; gap:0.35rem; width:100%; max-width:640px; padding:0 8px; }
+    .key-button { display:inline-flex; align-items:center; justify-content:center; padding:0.5rem 0.6rem; border-radius:14px; user-select:none; font-weight:700; text-transform:uppercase; min-width:34px; max-width:48px; flex:0 1 auto; }
     .key-button.wide { min-width:62px; max-width:120px; }
     .key-button.tiny { min-width:28px; max-width:36px; font-size:0.85rem; padding:0.45rem 0.4rem; }
 
-    /* Keep q and enter visible: ensure last row's special keys remain wide but wrap when needed */
     @media (max-width:520px){
       .key-button { min-width:30px; max-width:40px; padding:0.42rem 0.36rem; font-size:0.92rem; }
       .key-button.wide { min-width:54px; max-width:84px; }
     }
 
-    /* Board styles */
+    /* Board */
     .board { display:grid; grid-template-rows:repeat(6,1fr); gap:0.6rem; width:100%; max-width:420px; margin:0 auto; }
     .board-row { display:grid; grid-template-columns:repeat(5, 1fr); gap:0.6rem; }
-    .tile {
-      aspect-ratio:1/1;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      font-size:1.75rem;
-      font-weight:800;
-      border-radius:12px;
-      letter-spacing:0.06em;
-    }
+    .tile { aspect-ratio:1/1; display:flex; align-items:center; justify-content:center; font-size:1.75rem; font-weight:800; border-radius:12px; letter-spacing:0.06em; }
 
     /* Toast */
-    .toast {
-      position:fixed;
-      left:50%;
-      transform:translateX(-50%);
-      bottom:20px;
-      background:white;
-      border-radius:12px;
-      padding:8px 14px;
-      box-shadow:0 8px 24px rgba(16,24,40,0.12);
-      font-weight:600;
-      z-index:60;
-    }
+    .toast { position:fixed; left:50%; transform:translateX(-50%); bottom:20px; background:white; border-radius:12px; padding:8px 14px; box-shadow:0 8px 24px rgba(16,24,40,0.12); font-weight:600; z-index:60; }
 
-    /* Header sticky background handling */
-    header.sticky {
-      position:sticky;
-      top:0;
-      backdrop-filter: blur(6px);
-      z-index:40;
-    }
-
-    /* Small screens: reduce header sizing */
-    @media (max-width:420px){
-      .tile { font-size:1.4rem; }
-    }
-
-    /* Simple utility */
+    header.sticky { position:sticky; top:0; backdrop-filter: blur(6px); z-index:40; }
+    @media (max-width:420px){ .tile { font-size:1.4rem; } }
     .hidden-sm { display:none; }
     @media (min-width:640px){ .hidden-sm{ display:inline; } }
   </style>
@@ -131,341 +105,551 @@
   <div id="root"></div>
 
   <script>
-    (function(){
-      const { useState, useEffect, useMemo } = React;
+  (function(){
+    const { useState, useEffect, useMemo } = React;
 
-      /* --- Config / Word lists --- */
-      const SPECIALITY_WORDS = {
-        medicine: ["fever","acute","ulcer","viral","cough","tumor"],
-        orthopaedics: ["femur","joint","brace","screw","plate","tibia","spine","graft"],
-        neurology: ["brain","nerve","spasm","focal","tonic","glial"],
-        cardiology: ["aorta","valve","pulse","shock","lumen"],
-        pulmonology: ["lungs","cilia","cough","mucus"]
+    /* ===== Firebase handles from the global init ===== */
+    const auth = firebase.auth();
+    const db   = firebase.firestore();
+    const googleProvider = new firebase.auth.GoogleAuthProvider();
+
+    /* ===== Config / Word lists ===== */
+    const SPECIALITY_WORDS = {
+      medicine: ["fever","acute","ulcer","viral","cough","tumor"],
+      orthopaedics: ["femur","joint","brace","screw","plate","tibia","spine","graft"],
+      neurology: ["brain","nerve","spasm","focal","tonic","glial"],
+      cardiology: ["aorta","valve","pulse","shock","lumen"],
+      pulmonology: ["lungs","cilia","cough","mucus"]
+    };
+
+    /* RNG helpers for deterministic daily */
+    function xmur3(str){
+      let h = 1779033703 ^ str.length;
+      for (let i=0;i<str.length;i++){
+        h = Math.imul(h ^ str.charCodeAt(i), 3432918353);
+        h = (h << 13) | (h >>> 19);
+      }
+      return function(){
+        h = Math.imul(h ^ (h >>> 16), 2246822507);
+        h = Math.imul(h ^ (h >>> 13), 3266489909);
+        h ^= h >>> 16;
+        return h >>> 0;
       };
+    }
+    function mulberry32(a){
+      return function(){
+        let t = (a += 0x6d2b79f5);
+        t = Math.imul(t ^ (t >>> 15), t | 1);
+        t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+    }
+    function pickDailyWord(words, date, speciality){
+      if(!words || words.length===0) return null;
+      const yyyy = date.getUTCFullYear();
+      const mm = date.getUTCMonth()+1;
+      const dd = date.getUTCDate();
+      const seed = xmur3(`${yyyy}-${mm}-${dd}-${speciality}-juggle`)();
+      const rng = mulberry32(seed);
+      return words[Math.floor(rng()*words.length)];
+    }
+    function pickRandomWord(words){
+      if(!words || words.length===0) return null;
+      return words[Math.floor(Math.random()*words.length)];
+    }
 
-      /* deterministic daily pick helpers */
-      function xmur3(str){
-        let h = 1779033703 ^ str.length;
-        for (let i=0;i<str.length;i++){
-          h = Math.imul(h ^ str.charCodeAt(i), 3432918353);
-          h = (h << 13) | (h >>> 19);
-        }
-        return function(){
-          h = Math.imul(h ^ (h >>> 16), 2246822507);
-          h = Math.imul(h ^ (h >>> 13), 3266489909);
-          h ^= h >>> 16;
-          return h >>> 0;
-        };
+    function scoreGuess(guess, answer){
+      const res = Array(5).fill("wrong");
+      const used = Array(5).fill(false);
+      for(let i=0;i<5;i++){
+        if(guess[i] === answer[i]) { res[i] = "correct"; used[i]=true; }
       }
-      function mulberry32(a){
-        return function(){
-          let t = (a += 0x6d2b79f5);
-          t = Math.imul(t ^ (t >>> 15), t | 1);
-          t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-        };
+      for(let i=0;i<5;i++){
+        if(res[i] === "correct") continue;
+        for(let j=0;j<5;j++){
+          if(!used[j] && guess[i] === answer[j]) { res[i] = "present"; used[j]=true; break; }
+        }
       }
-      function pickDailyWord(words, date, speciality){
-        if(!words || words.length===0) return null;
-        const yyyy = date.getUTCFullYear();
-        const mm = date.getUTCMonth()+1;
-        const dd = date.getUTCDate();
-        const seed = xmur3(`${yyyy}-${mm}-${dd}-${speciality}-juggle`)();
-        const rng = mulberry32(seed);
-        return words[Math.floor(rng()*words.length)];
-      }
-      function pickRandomWord(words){
-        if(!words || words.length===0) return null;
-        return words[Math.floor(Math.random()*words.length)];
-      }
+      return res;
+    }
 
-      function scoreGuess(guess, answer){
-        // returns array of "correct"|"present"|"wrong"
-        const res = Array(5).fill("wrong");
-        const used = Array(5).fill(false);
-        for(let i=0;i<5;i++){
-          if(guess[i] === answer[i]) { res[i] = "correct"; used[i]=true; }
-        }
-        for(let i=0;i<5;i++){
-          if(res[i] === "correct") continue;
-          for(let j=0;j<5;j++){
-            if(!used[j] && guess[i] === answer[j]) { res[i] = "present"; used[j]=true; break; }
-          }
-        }
-        return res;
-      }
+    const KEY_ROWS = [
+      ["q","w","e","r","t","y","u","i","o","p"],
+      ["a","s","d","f","g","h","j","k","l"],
+      ["enter","z","x","c","v","b","n","m","back"]
+    ];
 
-      const KEY_ROWS = [
-        ["q","w","e","r","t","y","u","i","o","p"],
-        ["a","s","d","f","g","h","j","k","l"],
-        ["enter","z","x","c","v","b","n","m","back"]
-      ];
+    /* LocalStorage keys */
+    const LS_KEY          = "juggle:v1:stats";
+    const LS_MODE         = "juggle:v1:mode";
+    const LS_PUZZ         = "juggle:v1:today";
+    const LS_PLAYED       = "juggle:v1:played";
+    const LS_LOCKED_SPEC  = "juggle:v1:lockedSpec";
 
-      const LS_KEY = "juggle:v1:stats";
-      const LS_MODE = "juggle:v1:mode";
-      const LS_PUZZ = "juggle:v1:today";
+    const defaultStats = { games:0, wins:0, streak:0, bestStreak:0, dist:[0,0,0,0,0,0] };
+    function loadStats(){ try { const r = localStorage.getItem(LS_KEY); return r ? {...defaultStats, ...JSON.parse(r)} : defaultStats; } catch(e){ return defaultStats; } }
+    function saveStats(s){ try { localStorage.setItem(LS_KEY, JSON.stringify(s)); } catch(e){} }
 
-      const defaultStats = { games:0, wins:0, streak:0, bestStreak:0, dist:[0,0,0,0,0,0] };
-      function loadStats(){ try { const r = localStorage.getItem(LS_KEY); return r ? {...defaultStats, ...JSON.parse(r)} : defaultStats; } catch(e){ return defaultStats; } }
-      function saveStats(s){ try { localStorage.setItem(LS_KEY, JSON.stringify(s)); } catch(e){} }
+    function todayYMD(){ return new Date().toISOString().slice(0,10); }
 
-      /* --- App --- */
-      function App(){
-        const [speciality, setSpeciality] = useState(null);
-        const WORDS = useMemo(()=> speciality ? SPECIALITY_WORDS[speciality] : [], [speciality]);
-        const [mode, setMode] = useState(localStorage.getItem(LS_MODE) || "daily");
-        const todayKey = new Date().toISOString().slice(0,10);
+    /* ===== Views / Auth ===== */
+    const VIEWS = { HOME:'HOME', SELECT:'SELECT', GAME:'GAME', LEADER:'LEADER', STATS:'STATS' };
 
-        const [dailyWord, setDailyWord] = useState(null);
-        const [answer, setAnswer] = useState("");
-        const [rows, setRows] = useState(Array(6).fill(""));
-        const [states, setStates] = useState(Array(6).fill(Array(5).fill("empty")));
-        const [row, setRow] = useState(0);
-        const [col, setCol] = useState(0);
-        const [toast, setToast] = useState(null);
-        const [stats, setStats] = useState(loadStats());
-        const [gameOver, setGameOver] = useState({ over:false, win:false });
-        const [revealAnswer, setRevealAnswer] = useState(null);
+    function useAuth(){
+      const [user, setUser] = useState(null);
+      useEffect(()=> auth.onAuthStateChanged(setUser), []);
+      return user;
+    }
 
-        /* initialize answer when speciality or mode changes */
-        useEffect(()=>{
-          if(!speciality) return;
-          const PUZZ_KEY = `${LS_PUZZ}:${speciality}`;
-          let daily = null;
-          try{
-            const cached = localStorage.getItem(PUZZ_KEY);
-            if(cached){
-              const obj = JSON.parse(cached);
-              if(obj && obj.key === todayKey && obj.word && WORDS.includes(obj.word)){
-                daily = obj.word;
-              }
-            }
-          }catch(e){}
-          if(!daily && mode === "daily"){
-            daily = pickDailyWord(WORDS, new Date(), speciality);
-            try{ localStorage.setItem(PUZZ_KEY, JSON.stringify({ key: todayKey, word: daily })); }catch(e){}
-          }
-          const nextAnswer = mode === "daily" ? daily : pickRandomWord(WORDS);
-          setDailyWord(daily);
-          setAnswer(nextAnswer || "");
-          setRows(Array(6).fill(""));
-          setStates(Array(6).fill(Array(5).fill("empty")));
-          setRow(0); setCol(0);
-          setGameOver({ over:false, win:false});
-          setRevealAnswer(null);
-          try{ localStorage.setItem(LS_MODE, mode); }catch(e){}
-        }, [speciality, mode, todayKey]);
+    function signIn(){ return auth.signInWithPopup(googleProvider); }
+    function signOut(){ return auth.signOut(); }
 
-        /* keyboard events (physical keyboard) */
-        useEffect(()=>{
-          function onKey(e){
-            if(gameOver.over || !speciality) return;
-            const k = e.key.toLowerCase();
-            if(k === "enter") handleEnter();
-            else if(k === "backspace") handleBack();
-            else if(/^[a-z]$/.test(k)) handleChar(k);
-          }
-          window.addEventListener("keydown", onKey);
-          return ()=> window.removeEventListener("keydown", onKey);
-        }, [rows,row,col,gameOver,speciality]);
+    /* ===== Leaderboard ===== */
+    async function updateLeaderboard(user, stats){
+      if(!user) return;
+      const ref = db.collection('leaderboard').doc(user.uid);
+      const payload = {
+        uid: user.uid,
+        name: user.displayName || 'Anon',
+        photo: user.photoURL || '',
+        games: stats.games || 0,
+        wins: stats.wins || 0,
+        bestStreak: stats.bestStreak || 0,
+        lastUpdated: firebase.firestore.FieldValue.serverTimestamp()
+      };
+      await ref.set(payload, { merge: true });
+    }
 
-        function ping(msg){
-          setToast(msg);
-          setTimeout(()=> setToast(null), 1400);
-        }
+    async function fetchTopLeaderboard(limit=25){
+      const qs = await db.collection('leaderboard')
+        .orderBy('bestStreak','desc')
+        .orderBy('wins','desc')
+        .limit(limit)
+        .get();
+      return qs.docs.map(d=> d.data());
+    }
 
-        function handleChar(ch){
-          if(col >= 5 || row >= 6 || gameOver.over) return;
-          const next = rows.slice();
-          next[row] = (next[row] + ch).slice(0,5);
-          setRows(next);
-          setCol(Math.min(5, col+1));
-        }
-
-        function handleBack(){
-          if(col === 0 || gameOver.over) return;
-          const next = rows.slice();
-          next[row] = next[row].slice(0, col-1);
-          setRows(next);
-          setCol(col-1);
-        }
-
-        function handleEnter(){
-          if(!speciality || gameOver.over) return;
-          const guess = (rows[row]||"").toLowerCase();
-          if(guess.length !== 5) return ping("Enter a 5-letter word");
-          if(!/^[a-z]{5}$/.test(guess)) return ping("Letters only");
-          if(!answer || answer.length !== 5) {
-            // safety: if answer not set (no words in speciality), notify
-            ping("No valid answer available for this speciality.");
-            return;
-          }
-
-          const score = scoreGuess(guess, answer);
-          const ns = states.slice();
-          ns[row] = score;
-          setStates(ns);
-
-          if(guess === answer){
-            endGame(true, row);
-          } else if(row === 5){
-            setRevealAnswer(answer);
-            endGame(false, row);
-          } else {
-            setRow(row+1);
-            setCol(0);
-          }
-        }
-
-        function endGame(win, attempt){
-          setGameOver({ over:true, win });
-          const next = {...stats};
-          next.games += 1;
-          if(win){
-            next.wins += 1;
-            next.streak += 1;
-            next.bestStreak = Math.max(next.bestStreak, next.streak);
-            next.dist[attempt] = (next.dist[attempt] || 0) + 1;
-          } else {
-            next.streak = 0;
-          }
-          setStats(next);
-          saveStats(next);
-        }
-
-        function share(){
-          const lines = [];
-          lines.push(`Juggle ${mode === "daily" ? todayKey : "practice"}`);
-          lines.push(`${gameOver.win ? (row+1) : "X"}/6`);
-          for(let r=0;r<=row;r++){
-            const map = (states[r]||[]).map(s=> s==="correct" ? "🟩" : s==="present" ? "🟨" : "🟥").join("");
-            lines.push(map);
-          }
-          const out = lines.join("\n");
-          navigator.clipboard.writeText(out).then(()=> ping("Result copied"));
-        }
-
-        function keyColor(k){
-          // compute best known color for key based on previous rows
-          let state = "";
-          for(let r=0;r<row;r++){
-            for(let c=0;c<5;c++){
-              if((rows[r]||"")[c] === k){
-                const st = (states[r]||[])[c];
-                if(st === "correct") return getComputedStyle(document.documentElement).getPropertyValue('--correct').trim();
-                if(st === "present") state = "present";
-                else if(st === "wrong" && state !== "present") state = "wrong";
-              }
-            }
-          }
-          if(state === "present") return getComputedStyle(document.documentElement).getPropertyValue('--present').trim();
-          if(state === "wrong") return getComputedStyle(document.documentElement).getPropertyValue('--wrong').trim();
-          return getComputedStyle(document.documentElement).getPropertyValue('--key').trim();
-        }
-
-        if(!speciality){
-          // selection screen
-          return React.createElement("div", { className: "min-h-screen flex flex-col items-center justify-center px-4" },
-            React.createElement("div", { className: "text-center" },
-              React.createElement("h1", { className: "text-2xl font-extrabold mb-3" }, "Choose Speciality"),
-              React.createElement("p", { className: "text-sm opacity-70 mb-4" }, "Pick a speciality to start the daily Juggle word."),
-              React.createElement("div", { className: "flex flex-wrap justify-center gap-3" },
-                Object.keys(SPECIALITY_WORDS).map(spec =>
-                  React.createElement("button", {
-                    key: spec,
-                    onClick: ()=> setSpeciality(spec),
-                    className: "px-4 py-2 rounded-2xl key hover:opacity-90 font-semibold shadow-soft"
-                  }, spec.charAt(0).toUpperCase() + spec.slice(1))
-                )
-              ),
-              React.createElement("div", { className: "mt-6 text-xs opacity-70" }, "You can switch between Daily and Practice modes inside the game.")
+    /* ===== UI ===== */
+    function Header({ user, onNav, active }){
+      return (
+        React.createElement('header', { className:'sticky top-0 z-30', style:{ background:getCSS('--bg'), borderBottom:`1px solid ${getCSS('--border')}` } },
+          React.createElement('div', { className:'max-w-[960px] mx-auto px-4 py-3 flex items-center justify-between' },
+            React.createElement('div', { className:'flex items-center gap-2' },
+              React.createElement('h1', { className:'text-2xl font-extrabold tracking-tight' }, 'Juggle',
+                React.createElement('span', { className:'ml-2 text-sm font-medium opacity-70' }, 'medical wordle')
+              )
+            ),
+            React.createElement('div', { className:'flex items-center gap-2' },
+              React.createElement('button', { onClick: ()=> onNav(VIEWS.LEADER), className: navBtn(active===VIEWS.LEADER) }, 'Leaderboard'),
+              React.createElement('button', { onClick: ()=> onNav(VIEWS.STATS), className: navBtn(active===VIEWS.STATS) }, 'My Stats'),
+              user
+                ? React.createElement('button', { onClick: signOut, className:'px-3 py-2 rounded-2xl key hover:opacity-85 font-semibold' }, 'Sign out')
+                : null
             )
-          );
-        }
+          )
+        )
+      );
+    }
 
-        const headerWordCount = WORDS.length;
+    function navBtn(active){
+      return `px-3 py-2 rounded-2xl key hover:opacity-85 font-semibold ${active? 'ring-1 ring-black/10' : ''}`;
+    }
 
-        return React.createElement("div", { className: "min-h-screen w-full flex flex-col items-center" },
-          React.createElement("div", { className: "w-full max-w-[820px] px-4 pb-14" },
-            React.createElement("header", { className: "sticky top-0 z-30 bg-opacity-80 sticky", style: { background: getComputedStyle(document.documentElement).getPropertyValue('--bg').trim(), borderBottom: `1px solid ${getComputedStyle(document.documentElement).getPropertyValue('--border').trim()}` } },
-              React.createElement("div", { className: "flex items-center justify-between py-4" },
-                React.createElement("h1", { className: "text-2xl font-extrabold tracking-tight" }, "Juggle",
-                  React.createElement("span", { className: "ml-2 text-sm font-medium opacity-70" }, "medical wordle")
+    function getCSS(key){
+      return getComputedStyle(document.documentElement).getPropertyValue(key).trim();
+    }
+
+    function Home({ user, onPlay }){
+      return (
+        React.createElement('div', { className:'min-h-[70vh] w-full flex items-center justify-center px-4' },
+          React.createElement('div', { className:'text-center max-w-xl' },
+            React.createElement('h2', { className:'text-3xl sm:text-4xl font-extrabold mb-2' }, 'Welcome to Juggle'),
+            React.createElement('p', { className:'opacity-70 mb-6' }, 'A daily 5-letter medical word challenge for medicos.'),
+            user ? (
+              React.createElement('div', { className:'flex flex-col items-center gap-3' },
+                React.createElement('button', { onClick:onPlay, className:'px-5 py-3 rounded-2xl key font-bold hover:opacity-90 shadow-soft' }, 'Play now'),
+                React.createElement('div', { className:'text-sm opacity-80' }, `Signed in as ${user.displayName || 'Player'}`)
+              )
+            ) : (
+              React.createElement('div', { className:'flex flex-col items-center gap-3' },
+                React.createElement('button', { onClick: signIn, className:'px-5 py-3 rounded-2xl key font-bold hover:opacity-90 shadow-soft' }, 'Continue with Google'),
+                React.createElement('p', { className:'text-xs opacity-70' }, 'We only use your name and avatar to show on the leaderboard.')
+              )
+            )
+          )
+        )
+      );
+    }
+
+    function SelectSpeciality({ lockedSpecToday, requestSetSpeciality, speciality }){
+      return (
+        React.createElement('div', { className:'min-h-[60vh] flex flex-col items-center justify-center px-4' },
+          React.createElement('div', { className:'text-center' },
+            React.createElement('h3', { className:'text-2xl font-extrabold mb-3' }, 'Choose Speciality'),
+            React.createElement('p', { className:'text-sm opacity-70 mb-4' }, 'First speciality you pick is locked for today.'),
+            React.createElement('div', { className:'flex flex-wrap justify-center gap-3' },
+              Object.keys(SPECIALITY_WORDS).map(spec =>
+                React.createElement('button', {
+                  key: spec, onClick: ()=> requestSetSpeciality(spec),
+                  className:'px-4 py-2 rounded-2xl key hover:opacity-90 font-semibold shadow-soft'
+                }, spec.charAt(0).toUpperCase()+spec.slice(1))
+              )
+            ),
+            speciality ? React.createElement('p', { className:'mt-4 text-sm opacity-70' }, `Selected: ${speciality}`) : null
+          )
+        )
+      );
+    }
+
+    function Leaderboard(){
+      const [rows, setRows] = useState([]);
+      useEffect(()=>{ fetchTopLeaderboard().then(setRows).catch(console.error); },[]);
+      return (
+        React.createElement('div', { className:'max-w-2xl mx-auto px-4 py-6' },
+          React.createElement('h3', { className:'text-xl font-extrabold mb-3' }, 'Leaderboard'),
+          rows.length===0 ? React.createElement('p', { className:'opacity-70' }, 'No entries yet.') : (
+            React.createElement('div', { className:'overflow-x-auto' },
+              React.createElement('table', { className:'w-full text-sm' },
+                React.createElement('thead', null,
+                  React.createElement('tr', { className:'text-left border-b', style:{ borderColor:getCSS('--border') } },
+                    ['Rank','Player','Best Streak','Wins','Games'].map(h=> React.createElement('th', { key:h, className:'py-2 pr-4' }, h))
+                  )
                 ),
-                React.createElement("div", { className: "flex items-center gap-3" },
-                  React.createElement("button", { onClick: ()=> alert('Guess the 5-letter word in 6 tries.\nGreen = correct, Yellow = present, Red = absent.'), className: "rounded-2xl px-3 py-2 text-sm hover:opacity-80 key" }, "How"),
-                  React.createElement("button", { onClick: ()=> alert(`Played: ${stats.games}\nWin %: ${stats.games ? Math.round((stats.wins/stats.games)*100) : 0}\nStreak: ${stats.streak}\nBest: ${stats.bestStreak}`), className: "rounded-2xl px-3 py-2 text-sm hover:opacity-80 key" }, "Stats")
+                React.createElement('tbody', null,
+                  rows.map((r, idx)=> (
+                    React.createElement('tr', { key:r.uid || idx, className:'border-b last:border-b-0', style:{ borderColor:getCSS('--border') } },
+                      React.createElement('td', { className:'py-2 pr-4 font-semibold' }, idx+1),
+                      React.createElement('td', { className:'py-2 pr-4 flex items-center gap-2' },
+                        r.photo ? React.createElement('img', { src:r.photo, className:'w-6 h-6 rounded-full', alt:'' }) : null,
+                        React.createElement('span', null, r.name || 'Player')
+                      ),
+                      React.createElement('td', { className:'py-2 pr-4' }, r.bestStreak||0),
+                      React.createElement('td', { className:'py-2 pr-4' }, r.wins||0),
+                      React.createElement('td', { className:'py-2 pr-4' }, r.games||0)
+                    )
+                  ))
                 )
               )
-            ),
+            )
+          )
+        )
+      );
+    }
 
-            React.createElement("div", { className: "flex items-center justify-between py-3 text-sm opacity-80" },
-              React.createElement("div", null, "Mode: ",
-                React.createElement("button", { onClick: ()=> setMode("daily"), className: `px-2 py-1 rounded-xl mr-2 ${mode === "daily" ? "font-semibold" : "opacity-70"}`, style: { background: getComputedStyle(document.documentElement).getPropertyValue('--key').trim() } }, "Daily"),
-                React.createElement("button", { onClick: ()=> setMode("practice"), className: `px-2 py-1 rounded-xl ${mode === "practice" ? "font-semibold" : "opacity-70"}`, style: { background: getComputedStyle(document.documentElement).getPropertyValue('--key').trim() } }, "Practice")
+    function Stats({ stats, onShare }){
+      const total = stats.games||0;
+      const winPct = total ? Math.round((stats.wins/total)*100) : 0;
+      return (
+        React.createElement('div', { className:'max-w-xl mx-auto px-4 py-6' },
+          React.createElement('h3', { className:'text-xl font-extrabold mb-4' }, 'My Stats'),
+          React.createElement('div', { className:'grid grid-cols-2 gap-4 mb-6' },
+            cardStat('Games', total),
+            cardStat('Win %', winPct),
+            cardStat('Streak', stats.streak||0),
+            cardStat('Best Streak', stats.bestStreak||0)
+          ),
+          React.createElement('div', { className:'mb-4' },
+            React.createElement('h4', { className:'font-bold mb-2' }, 'Guess Distribution'),
+            React.createElement('div', { className:'space-y-2' },
+              (stats.dist||[]).map((v,i)=> (
+                React.createElement('div', { key:i, className:'flex items-center gap-2' },
+                  React.createElement('div', { className:'w-6 text-right text-xs opacity-70' }, String(i+1)),
+                  React.createElement('div', { className:'flex-1 h-4 rounded key', style:{ width: `${Math.max(6, v*10)}%` } },
+                    React.createElement('span', { className:'pl-2 text-xs font-semibold' }, v||0)
+                  )
+                )
+              ))
+            )
+          ),
+          React.createElement('button', { onClick:onShare, className:'px-4 py-2 rounded-2xl key font-semibold hover:opacity-90 shadow-soft' }, 'Share my stats')
+        )
+      );
+    }
+    function cardStat(label, value){
+      return React.createElement('div', { className:'rounded-2xl key p-4 shadow-soft' },
+        React.createElement('div', { className:'text-xs opacity-70' }, label),
+        React.createElement('div', { className:'text-2xl font-extrabold' }, value)
+      );
+    }
+
+    /* ===== Game ===== */
+    function Game({ speciality, mode, setMode, onFinish, externalStats, setExternalStats, pingGlobal, lockedSpecToday }){
+      const WORDS = useMemo(()=> speciality ? SPECIALITY_WORDS[speciality] : [], [speciality]);
+      const todayKey = todayYMD();
+
+      const [answer, setAnswer] = useState("");
+      const [rows, setRows] = useState(Array(6).fill(""));
+      const [states, setStates] = useState(Array(6).fill(Array(5).fill("empty")));
+      const [row, setRow] = useState(0);
+      const [col, setCol] = useState(0);
+      const [toast, setToast] = useState(null);
+      const [stats, setStats] = useState(externalStats || loadStats());
+      const [gameOver, setGameOver] = useState({ over:false, win:false });
+      const [revealAnswer, setRevealAnswer] = useState(null);
+      const [playedToday, setPlayedToday] = useState(false);
+
+      function ping(msg){ setToast(msg); setTimeout(()=> setToast(null), 1400); pingGlobal && pingGlobal(msg); }
+
+      useEffect(()=>{
+        if(!speciality) return;
+
+        const PUZZ_KEY   = `${LS_PUZZ}:${speciality}`;
+        const PLAYED_KEY = `${LS_PLAYED}:${todayKey}:${speciality}`;
+
+        // read cached daily word if present
+        let daily = null;
+        try{
+          const cached = localStorage.getItem(PUZZ_KEY);
+          if(cached){
+            const obj = JSON.parse(cached);
+            if(obj && obj.key === todayKey && obj.word && WORDS.includes(obj.word)){
+              daily = obj.word;
+            }
+          }
+        }catch(e){}
+
+        if(!daily && mode === "daily"){
+          daily = pickDailyWord(WORDS, new Date(), speciality);
+          try{ localStorage.setItem(PUZZ_KEY, JSON.stringify({ key: todayKey, word: daily })); }catch(e){}
+        }
+        const nextAnswer = mode === "daily" ? daily : pickRandomWord(WORDS);
+
+        // already played today?
+        let alreadyPlayed = false;
+        try{
+          const played = JSON.parse(localStorage.getItem(PLAYED_KEY) || "null");
+          if(played && played.key === todayKey && played.completed === true){
+            alreadyPlayed = true;
+          }
+        }catch(e){}
+
+        setAnswer(nextAnswer || "");
+        setRows(Array(6).fill(""));
+        setStates(Array(6).fill(Array(5).fill("empty")));
+        setRow(0); setCol(0);
+
+        if(mode === "daily" && alreadyPlayed){
+          setGameOver({ over:true, win:false });
+          setRevealAnswer(nextAnswer || daily || null);
+        } else {
+          setGameOver({ over:false, win:false });
+          setRevealAnswer(null);
+        }
+        setPlayedToday(alreadyPlayed);
+
+        try{ localStorage.setItem(LS_MODE, mode); }catch(e){}
+      }, [speciality, mode]);
+
+      useEffect(()=>{
+        function onKey(e){
+          if(gameOver.over || playedToday) return;
+          const k = e.key.toLowerCase();
+          if(k === "enter") handleEnter();
+          else if(k === "backspace") handleBack();
+          else if(/^[a-z]$/.test(k)) handleChar(k);
+        }
+        window.addEventListener("keydown", onKey);
+        return ()=> window.removeEventListener("keydown", onKey);
+      }, [rows,row,col,gameOver,playedToday]);
+
+      function handleChar(ch){
+        if(col >= 5 || row >= 6 || gameOver.over || playedToday) return;
+        const next = rows.slice();
+        next[row] = (next[row] + ch).slice(0,5);
+        setRows(next);
+        setCol(Math.min(5, col+1));
+      }
+      function handleBack(){
+        if(col === 0 || gameOver.over || playedToday) return;
+        const next = rows.slice();
+        next[row] = next[row].slice(0, col-1);
+        setRows(next);
+        setCol(col-1);
+      }
+      function handleEnter(){
+        if(gameOver.over || playedToday) return;
+        const guess = (rows[row]||"").toLowerCase();
+        if(guess.length !== 5) return ping("Enter a 5-letter word");
+        if(!/^[a-z]{5}$/.test(guess)) return ping("Letters only");
+        if(!answer || answer.length !== 5) { ping("No valid answer available."); return; }
+
+        const score = scoreGuess(guess, answer);
+        const ns = states.slice(); ns[row] = score; setStates(ns);
+
+        if(guess === answer){ endGame(true, row); }
+        else if(row === 5){ setRevealAnswer(answer); endGame(false, row); }
+        else { setRow(row+1); setCol(0); }
+      }
+
+      function endGame(win, attempt){
+        setGameOver({ over:true, win });
+        const next = {...stats};
+        next.games += 1;
+        if(win){ next.wins += 1; next.streak += 1; next.bestStreak = Math.max(next.bestStreak, next.streak); next.dist[attempt] = (next.dist[attempt]||0)+1; }
+        else { next.streak = 0; }
+        setStats(next); saveStats(next); setExternalStats && setExternalStats(next); onFinish && onFinish(next);
+
+        try{
+          if(mode === "daily"){
+            const PLAYED_KEY = `${LS_PLAYED}:${todayYMD()}:${speciality}`;
+            localStorage.setItem(PLAYED_KEY, JSON.stringify({ key: todayYMD(), word: answer, completed: true, win, attempts: attempt+1 }));
+          }
+        }catch(e){}
+      }
+
+      function copyToClipboard(text){
+        if (navigator.clipboard && window.isSecureContext){ return navigator.clipboard.writeText(text); }
+        const ta = document.createElement("textarea"); ta.value = text; ta.style.position = "fixed"; ta.style.left = "-9999px"; document.body.appendChild(ta); ta.focus(); ta.select(); try { document.execCommand("copy"); } catch(e){} document.body.removeChild(ta); return Promise.resolve();
+      }
+      function share(){
+        const lines = [];
+        lines.push(`Juggle ${mode === "daily" ? todayYMD() : "practice"}`);
+        lines.push(`${gameOver.win ? (row+1) : "X"}/6`);
+        for(let r=0;r<=row;r++){
+          const map = (states[r]||[]).map(s=> s==="correct" ? "🟩" : s==="present" ? "🟨" : "🟥").join("");
+          lines.push(map);
+        }
+        const out = lines.join("\n");
+        copyToClipboard(out).then(()=> ping("Result copied"));
+      }
+
+      function keyColor(k){
+        let state = "";
+        for(let r=0;r<row;r++){
+          for(let c=0;c<5;c++){
+            if((rows[r]||"")[c] === k){
+              const st = (states[r]||[])[c];
+              if(st === "correct") return getCSS('--correct');
+              if(st === "present") state = "present";
+              else if(st === "wrong" && state !== "present") state = "wrong";
+            }
+          }
+        }
+        if(state === "present") return getCSS('--present');
+        if(state === "wrong") return getCSS('--wrong');
+        return getCSS('--key');
+      }
+
+      const headerWordCount = WORDS.length;
+
+      return (
+        React.createElement('div', { className:'min-h-screen w-full flex flex-col items-center' },
+          React.createElement('div', { className:'w-full max-w-[820px] px-4 pb-14' },
+
+            React.createElement('div', { className:'flex items-center justify-between py-3 text-sm opacity-80' },
+              React.createElement('div', null, 'Mode: ',
+                React.createElement('button', { onClick: ()=> setMode('daily'), className:`px-2 py-1 rounded-xl mr-2 ${mode==='daily'?'font-semibold':'opacity-70'}`, style:{ background:getCSS('--key') } }, 'Daily'),
+                React.createElement('button', { onClick: ()=> setMode('practice'), className:`px-2 py-1 rounded-xl ${mode==='practice'?'font-semibold':'opacity-70'}`, style:{ background:getCSS('--key') } }, 'Practice')
               ),
-              React.createElement("div", { className: "hidden-sm" }, "Speciality: ",
-                React.createElement("span", { className: "font-semibold" }, speciality.charAt(0).toUpperCase() + speciality.slice(1)),
-                " · Words: ",
-                React.createElement("span", { className: "font-semibold" }, String(headerWordCount))
+              React.createElement('div', { className:'hidden-sm' }, 'Speciality: ',
+                React.createElement('span', { className:'font-semibold' }, speciality ? (speciality.charAt(0).toUpperCase()+speciality.slice(1)) : '-'),
+                ' · Words: ', React.createElement('span', { className:'font-semibold' }, String(headerWordCount))
               )
             ),
 
-            // Board
-            React.createElement("div", { className: "board my-4" },
+            React.createElement('div', { className:'board my-4' },
               Array.from({length:6}).map((_, r) =>
-                React.createElement("div", { key: r, className: "board-row" },
+                React.createElement('div', { key:r, className:'board-row' },
                   Array.from({length:5}).map((_, c) => {
                     const ch = (rows[r]||'')[c] || '';
-                    const st = (states[r]||[])[c] || "empty";
-                    const cls = "tile rounded-xl " + (st !== "empty" ? st : "");
-                    return React.createElement("div", { key:c, className: cls }, (ch || '').toUpperCase());
+                    const st = (states[r]||[])[c] || 'empty';
+                    const cls = 'tile rounded-xl ' + (st !== 'empty' ? st : '');
+                    return React.createElement('div', { key:c, className: cls }, (ch || '').toUpperCase());
                   })
                 )
               )
             ),
 
-            // Reveal answer when lost
-            (gameOver.over && !gameOver.win && revealAnswer) ? React.createElement("div", { className: "text-center text-lg font-bold text-red-600 mb-4" }, `The word was: ${revealAnswer.toUpperCase()}`) : null,
+            (gameOver.over && !gameOver.win && revealAnswer)
+              ? React.createElement('div', { className:'text-center text-lg font-bold text-red-600 mb-4' }, `The word was: ${revealAnswer && revealAnswer.toUpperCase()}`)
+              : null,
 
-            // Keyboard (responsive)
-            React.createElement("div", { className: "keyboard" },
+            React.createElement('div', { className:'keyboard' },
               KEY_ROWS.map((rowKeys, i) =>
-                React.createElement("div", { key:i, className: "keyboard-row" },
-                  rowKeys.map(k => {
-                    const isWide = k.length > 1;
-                    const btnClass = "key-button " + (isWide ? "wide" : "");
-                    const label = k === "back" ? "⌫" : k;
-                    return React.createElement("button", {
+                React.createElement('div', { key:i, className:'keyboard-row' },
+                  rowKeys.map(k => (
+                    React.createElement('button', {
                       key:k,
-                      onClick: ()=> { if(k === "enter") handleEnter(); else if(k === "back") handleBack(); else handleChar(k); },
-                      className: btnClass + " rounded-2xl font-semibold key",
-                      style: { background: keyColor(k), border: `1px solid ${getComputedStyle(document.documentElement).getPropertyValue('--border').trim()}` }
-                    }, label);
-                  })
+                      onClick: ()=> { if(k==='enter') handleEnter(); else if(k==='back') handleBack(); else handleChar(k); },
+                      disabled: gameOver.over,
+                      className: 'key-button ' + (k.length>1 ? 'wide' : '') + ' rounded-2xl font-semibold key',
+                      style:{ background:keyColor(k), border:`1px solid ${getCSS('--border')}`, opacity: gameOver.over?0.6:1 }
+                    }, k==='back'?'⌫':k)
+                  ))
                 )
               )
             ),
 
-            // Actions
-            React.createElement("div", { className: "flex items-center justify-between mt-4" },
-              React.createElement("div", null,
-                React.createElement("button", { onClick: share, className: "rounded-2xl px-4 py-2 font-semibold hover:opacity-90 key mr-3" }, "Share"),
-                React.createElement("button", { onClick: ()=> { setMode(mode === "daily" ? "practice" : "daily"); }, className: "rounded-2xl px-4 py-2 font-semibold hover:opacity-90 key" }, mode === "daily" ? "Practice" : "New Daily")
+            React.createElement('div', { className:'flex items-center justify-between mt-4' },
+              React.createElement('div', null,
+                React.createElement('button', { onClick: share, className:'rounded-2xl px-4 py-2 font-semibold hover:opacity-90 key mr-3' }, 'Share'),
+                React.createElement('button', { onClick: ()=> { setMode(mode==='daily'?'practice':'daily'); }, className:'rounded-2xl px-4 py-2 font-semibold hover:opacity-90 key' }, mode==='daily'?'Practice':'New Daily')
               ),
-              React.createElement("div", { className: "text-xs opacity-70" }, "© Parabox · Juggle v1")
+              React.createElement('div', { className:'text-xs opacity-70' }, '© Parabox · Juggle v3')
             ),
 
-            // Toast
-            toast ? React.createElement("div", { className: "toast" }, toast) : null
+            toast ? React.createElement('div', { className:'toast' }, toast) : null
           )
-        );
+        )
+      );
+    }
+
+    /* ===== App Shell ===== */
+    function App(){
+      const user = useAuth();
+      const [view, setView] = useState(VIEWS.HOME);
+      const [toast, setToast] = useState(null);
+      const [mode, setMode] = useState(localStorage.getItem(LS_MODE) || 'daily');
+      const [speciality, setSpeciality] = useState(null);
+      const [lockedSpecToday, setLockedSpecToday] = useState(null);
+      const [stats, setStats] = useState(loadStats());
+
+      const todayKey = todayYMD();
+
+      useEffect(()=>{
+        try{
+          const lock = JSON.parse(localStorage.getItem(`${LS_LOCKED_SPEC}:${todayKey}`) || 'null');
+          setLockedSpecToday(lock && lock.spec ? lock.spec : null);
+        }catch(e){}
+      },[]);
+
+      function ping(msg){ setToast(msg); setTimeout(()=> setToast(null), 1400); }
+
+      function requestSetSpeciality(spec){
+        const current = JSON.parse(localStorage.getItem(`${LS_LOCKED_SPEC}:${todayKey}`) || 'null');
+        if(current && current.spec && current.spec !== spec){
+          ping(`Today’s speciality is locked to ${current.spec}. Come back tomorrow.`);
+          return;
+        }
+        if(!current){
+          localStorage.setItem(`${LS_LOCKED_SPEC}:${todayKey}`, JSON.stringify({ key: todayKey, spec }));
+          setLockedSpecToday(spec);
+        }
+        setSpeciality(spec); setView(VIEWS.GAME);
       }
 
-      // Render
-      const root = ReactDOM.createRoot(document.getElementById('root'));
-      root.render(React.createElement(App));
-    })();
+      async function onGameFinish(updatedStats){
+        setStats(updatedStats);
+        try{ if(user) { await updateLeaderboard(user, updatedStats); } } catch(e){ console.error(e); }
+      }
+
+      return (
+        React.createElement('div', { className:'min-h-screen w-full' },
+          React.createElement(Header, { user, onNav:setView, active:view }),
+          view===VIEWS.HOME && React.createElement(Home, { user, onPlay: ()=> setView(VIEWS.SELECT) }),
+          view===VIEWS.SELECT && React.createElement(SelectSpeciality, { lockedSpecToday, requestSetSpeciality, speciality }),
+          view===VIEWS.GAME && React.createElement(Game, { speciality, mode, setMode, onFinish:onGameFinish, externalStats:stats, setExternalStats:setStats, pingGlobal:ping, lockedSpecToday }),
+          view===VIEWS.LEADER && React.createElement(Leaderboard, null),
+          view===VIEWS.STATS && React.createElement(Stats, { stats, onShare: ()=> navigator.clipboard.writeText(JSON.stringify(stats)).then(()=> ping('Stats copied')) }),
+          toast ? React.createElement('div', { className:'toast' }, toast) : null
+        )
+      );
+    }
+
+    // Render
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(React.createElement(App));
+  })();
   </script>
 </body>
 </html>
